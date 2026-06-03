@@ -15,8 +15,7 @@ import 'screens/send_code_screen.dart';
 import 'screens/user_provider.dart';
 import 'screens/verefication2_screen.dart';
 import 'screens/welcome_screen_modified.dart';
-import 'screens/worker_verification_screen.dart';
-import 'screens/task_details_screen.dart';
+import 'screens/worker_map_test_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
@@ -142,7 +141,10 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const LoginScreen(),
+      // home: const WelcomeScreenModified(),
+      // home: const MainScreen(selectedSkills: []),
+      // TODO: REVERT THIS LATER
+      home: const WorkerMapTestScreen(),
     );
   }
 }

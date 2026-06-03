@@ -413,6 +413,12 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<bool> submitOffer(String taskId, int price, String message) async {
+    // MOCK: submitOffer called without backend API call
+    debugPrint("MOCK API: submitOffer called for taskId: $taskId, price: $price");
+    _myBids[taskId] = 'pending';
+    notifyListeners();
+    return true;
+    /*
     try {
       final currentToken = await _getToken();
       if (currentToken == null) return false;
@@ -443,6 +449,7 @@ class UserProvider extends ChangeNotifier {
       debugPrint("Error submitting offer: $e");
       return false;
     }
+    */
   }
 
   Future<List<Map<String, dynamic>>> fetchTaskOffers(String taskId) async {

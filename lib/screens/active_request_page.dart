@@ -26,7 +26,19 @@ class _ActiveRequestPageState extends State<ActiveRequestPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
-      appBar: AppBar(title: const Text("Active Requests")),
+      appBar: AppBar(
+        title: const Text(
+          "Active Requests",
+          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.backgroundWhite),
+        ),
+        centerTitle: true,
+        backgroundColor: AppColors.primaryDarkGreen,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: AppColors.backgroundWhite),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, child) {
           final requests = userProvider.myRequests;

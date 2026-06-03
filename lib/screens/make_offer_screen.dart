@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'user_provider.dart';
 import 'welcome_screen_modified.dart';
+import '../services/location_service.dart';
 
 class MakeOfferScreen extends StatefulWidget {
   final String taskId;
@@ -57,21 +58,16 @@ class _MakeOfferScreenState extends State<MakeOfferScreen> {
 
     setState(() => _isLoading = true);
 
+    // Mock submitting the offer (backend HTTP POST is commented out inside user_provider.dart)
     final success = await Provider.of<UserProvider>(context, listen: false)
         .submitOffer(widget.taskId, price, _messageController.text.trim());
 
-    setState(() => _isLoading = false);
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Offer submitted successfully! ✅'), backgroundColor: Colors.green),
-      );
-      Navigator.pop(context); // Go back to details
-      Navigator.pop(context); // Go back to jobs list
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to submit offer. You might have already bid on this task.'), backgroundColor: Colors.red),
-      );
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (success) {
+        Navigator.pop(context); // Go back to details
+        Navigator.pop(context); // Go back to jobs list
+      }
     }
   }
 

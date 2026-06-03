@@ -44,10 +44,20 @@ class _TaskOffersScreenState extends State<TaskOffersScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: Text("Offers for ${widget.taskTitle}"),
-        backgroundColor: Colors.transparent,
+        title: const Text(
+          "Offers",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.backgroundWhite,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: AppColors.primaryDarkGreen,
         elevation: 0,
-        foregroundColor: AppColors.primaryDarkGreen,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: AppColors.backgroundWhite),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

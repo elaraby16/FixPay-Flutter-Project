@@ -8,6 +8,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_constants.dart';
+import 'package:latlong2/latlong.dart' hide Path;
+import 'location_picker_screen.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -32,6 +34,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   bool _isCategoriesLoading = false;
   List<dynamic> _categories = [];
   String? _selectedCategoryId;
+  double? _selectedLat;
+  double? _selectedLng;
 
   // 1. تعريف متغير لحفظ الصورة والـ ImagePicker
   XFile? _profileImage;
@@ -242,6 +246,42 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
                 if (_selectedRole == 'Worker') ...[
                   const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push<LatLng>(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LocationPickerScreen()),
+                      );
+                      if (result != null) {
+                        setState(() {
+                          _selectedLat = result.latitude;
+                          _selectedLng = result.longitude;
+                        });
+                      }
+                    },
+                    icon: Icon(
+                      _selectedLat == null ? Icons.add_location_alt_rounded : Icons.check_circle_rounded,
+                      color: _selectedLat == null ? AppColors.primaryDarkGreen : Colors.green,
+                    ),
+                    label: Text(
+                      _selectedLat == null ? 'تحديد موقع العمل (مطلوب)' : 'تم تحديد الموقع بنجاح ✅',
+                      style: TextStyle(
+                        color: _selectedLat == null ? AppColors.primaryDarkGreen : Colors.green[800],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 52),
+                      side: BorderSide(
+                        color: _selectedLat == null ? AppColors.primaryDarkGreen : Colors.green,
+                        width: 2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   if (_isCategoriesLoading)
                     const Center(child: CircularProgressIndicator())
                   else if (_categories.isEmpty)
@@ -327,6 +367,15 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                             );
                             return;
                           }
+                          if (_selectedRole == 'Worker' && (_selectedLat == null || _selectedLng == null)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please select your work location (رجاء تحديد موقع العمل)'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
                           if (_formKey.currentState!.validate()) {
                             setState(() {
                               _isLoading = true;
@@ -352,6 +401,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                                 "dateOfBirth": "01-01-2000", // Placeholder to satisfy schema if needed
                                 "gender": 0, // Placeholder
                               };
+                              if (_selectedRole == 'Worker' && _selectedLat != null) {
+                                payload['locationCoords'] = {
+                                  'lat': _selectedLat,
+                                  'lng': _selectedLng,
+                                };
+                              }
                               if (_selectedRole == 'Worker') {
                                 payload["categoryId"] = _selectedCategoryId;
                                 payload["bio"] = bioController.text.trim();
