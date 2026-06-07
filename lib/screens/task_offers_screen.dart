@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'user_provider.dart';
 import 'welcome_screen_modified.dart';
 import 'chat_screen.dart';
+import '../widgets/rating_dialog.dart';
 
 class TaskOffersScreen extends StatefulWidget {
   final String taskId;
@@ -21,6 +22,7 @@ class TaskOffersScreen extends StatefulWidget {
 class _TaskOffersScreenState extends State<TaskOffersScreen> {
   List<Map<String, dynamic>> _offers = [];
   bool _isLoading = true;
+  bool _isCompleting = false;
 
   @override
   void initState() {
@@ -29,18 +31,40 @@ class _TaskOffersScreenState extends State<TaskOffersScreen> {
   }
 
   Future<void> _loadOffers() async {
-    final offers = await Provider.of<UserProvider>(context, listen: false)
-        .fetchTaskOffers(widget.taskId);
-    if (mounted) {
-      setState(() {
-        _offers = offers;
-        _isLoading = false;
-      });
+    try {
+      final offers = await Provider.of<UserProvider>(context, listen: false)
+          .fetchTaskOffers(widget.taskId);
+      if (mounted) {
+        setState(() {
+          _offers = offers;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading task offers: $e");
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final task = userProvider.myRequests.firstWhere(
+      (t) => t['id'] == widget.taskId,
+      orElse: () => <String, dynamic>{},
+    );
+    final status = task['status']?.toString().toUpperCase() ?? '';
+    final bool isAssigned = task.isNotEmpty &&
+        (status == 'ASSIGNED' ||
+         status == 'IN_PROGRESS' ||
+         status == 'ONGOING' ||
+         status == 'ACCEPTED' ||
+         _offers.any((o) => o['status']?.toString().toLowerCase() == 'accepted'));
+
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
@@ -62,7 +86,7 @@ class _TaskOffersScreenState extends State<TaskOffersScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _offers.isEmpty
-              ? const Center(child: Text("No offers received yet."))
+              ? const Center(child: Text("No offers yet. Waiting for workers."))
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _offers.length,
@@ -197,7 +221,7 @@ class _TaskOffersScreenState extends State<TaskOffersScreen> {
                                         foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                                       ),
-                                      child: const Text("Accept"),
+                                      child: const Text("Accept Offer"),
                                     ),
                                   ],
                                 ),
@@ -209,6 +233,98 @@ class _TaskOffersScreenState extends State<TaskOffersScreen> {
                     );
                   },
                 ),
+      bottomNavigationBar: isAssigned
+          ? Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryDarkGreen,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 54),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  elevation: 2,
+                ),
+                onPressed: _isCompleting
+                    ? null
+                    : () async {
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+                        setState(() => _isCompleting = true);
+                        final provider = Provider.of<UserProvider>(context, listen: false);
+                        final success = await provider.completeTask(widget.taskId);
+
+                        if (!mounted) return;
+                        setState(() => _isCompleting = false);
+
+                        if (success) {
+                          if (!context.mounted) return;
+                          final result = await showDialog<Map<String, dynamic>>(
+                            context: context,
+                            builder: (context) => const RatingDialog(),
+                          );
+                          if (result != null && result['rating'] != null) {
+                            final rating = result['rating'] as int;
+                            if (mounted) {
+                              setState(() => _isCompleting = true);
+                            }
+                            final rateSuccess = await provider.rateWorker(widget.taskId, rating);
+                            if (mounted) {
+                              setState(() => _isCompleting = false);
+                              if (rateSuccess) {
+                                scaffoldMessenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Task completed and worker rated successfully! ✅'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              } else {
+                                scaffoldMessenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Task completed, but rating submission failed. ❌'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                              }
+                              provider.fetchMyRequests();
+                              _loadOffers();
+                            }
+                          } else {
+                            if (mounted) {
+                              scaffoldMessenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Task completed successfully! ✅'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              provider.fetchMyRequests();
+                              _loadOffers();
+                            }
+                          }
+                        } else {
+                          if (mounted) {
+                            scaffoldMessenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Failed to complete task. Please try again. ❌'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                child: _isCompleting
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                      )
+                    : const Text(
+                        'Complete Task',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+              ),
+            )
+          : null,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_constants.dart';
 
@@ -41,6 +42,8 @@ class UserProvider extends ChangeNotifier {
 
   bool _hasNewNotifications = false;
   Map<String, String> _myBids = {}; // taskId -> status ('pending', 'accepted', etc.)
+  List<Map<String, dynamic>> _taskOffers = [];
+  List<Map<String, dynamic>> get taskOffers => _taskOffers;
 
   // --- [4] Getters ---
   String get userName => _userName.isEmpty ? "" : _userName;
@@ -372,7 +375,7 @@ class UserProvider extends ChangeNotifier {
             customer = Map<String, dynamic>.from(t['customerId']);
           }
 
-          return {
+           return {
             'id': t['_id'],
             'title': t['title'] ?? "No Title",
             'details': t['description'] ?? "No Description",
@@ -384,6 +387,8 @@ class UserProvider extends ChangeNotifier {
                 : "Recently",
             'icon': Icons.work_outline,
             'customer': customer,
+            'locationCoords': t['locationCoords'],
+            'images': t['images'],
           };
         }).toList();
 
@@ -413,21 +418,26 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<bool> submitOffer(String taskId, int price, String message) async {
-    // MOCK: submitOffer called without backend API call
-    debugPrint("MOCK API: submitOffer called for taskId: $taskId, price: $price");
-    _myBids[taskId] = 'pending';
-    notifyListeners();
-    return true;
-    /*
     try {
-      final currentToken = await _getToken();
-      if (currentToken == null) return false;
+      final prefs = await SharedPreferences.getInstance();
+      final String? savedToken = prefs.getString('jwt_token');
+      final String? currentToken = _token ?? savedToken;
+
+      if (currentToken == null || currentToken.isEmpty) {
+        print('⚠️ Warning: Token is null or empty in submitOffer!');
+        return false;
+      }
+      _token = currentToken; // Update local token cache
+
+      print('🔍 [DEBUG] Token being sent in submitOffer: $currentToken');
 
       final response = await http.post(
         Uri.parse(ApiConstants.offers),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'bearer $currentToken',
+          'authorization': 'bearer $currentToken',
+          'token': currentToken,
         },
         body: jsonEncode({
           'taskId': taskId,
@@ -436,7 +446,9 @@ class UserProvider extends ChangeNotifier {
         }),
       );
 
-      if (response.statusCode == 201) {
+      print('🚀 OFFER_SUBMIT_RESPONSE: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint("Offer submitted successfully");
         _myBids[taskId] = 'pending';
         notifyListeners();
@@ -449,30 +461,44 @@ class UserProvider extends ChangeNotifier {
       debugPrint("Error submitting offer: $e");
       return false;
     }
-    */
   }
 
   Future<List<Map<String, dynamic>>> fetchTaskOffers(String taskId) async {
     final String? currentToken = await _getToken();
-    if (currentToken == null) return [];
+    if (currentToken == null || currentToken.isEmpty) {
+      _taskOffers = [];
+      notifyListeners();
+      return [];
+    }
 
     try {
+      final baseUrl = dotenv.env['BASE_URL'] ?? ApiConstants.baseApiUrl;
       final response = await http.get(
-        Uri.parse("${ApiConstants.tasks}/$taskId/offers"),
+        Uri.parse("$baseUrl/tasks/$taskId/offers"),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'bearer $currentToken',
+          'authorization': 'bearer $currentToken',
         },
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final List offers = data['data'] != null && data['data']['offers'] != null ? data['data']['offers'] : [];
-        return offers.map<Map<String, dynamic>>((o) => Map<String, dynamic>.from(o)).toList();
+        final List offers = data['data'] != null && data['data']['offers'] != null 
+            ? data['data']['offers'] 
+            : (data['offers'] ?? (data['data'] is List ? data['data'] : []));
+        
+        _taskOffers = offers.map<Map<String, dynamic>>((o) => Map<String, dynamic>.from(o)).toList();
+        notifyListeners();
+        return _taskOffers;
       }
+      _taskOffers = [];
+      notifyListeners();
       return [];
     } catch (e) {
       debugPrint("Error fetching task offers: $e");
+      _taskOffers = [];
+      notifyListeners();
       return [];
     }
   }
@@ -548,6 +574,106 @@ class UserProvider extends ChangeNotifier {
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       debugPrint("Error sending message: $e");
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAssignedTasks() async {
+    final String? currentToken = await _getToken();
+    if (currentToken == null || currentToken.isEmpty) return [];
+
+    try {
+      final baseUrl = dotenv.env['BASE_URL'] ?? ApiConstants.baseApiUrl;
+      print('🔍 [DEBUG] fetchAssignedTasks called. URL: ${dotenv.env['BASE_URL']}/tasks/worker/assigned');
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/tasks/worker/assigned"),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'bearer $currentToken',
+          'authorization': 'bearer $currentToken',
+          'token': currentToken,
+        },
+      );
+
+      print('🔍 [DEBUG] fetchAssignedTasks Status: ${response.statusCode}');
+      print('🔍 [DEBUG] fetchAssignedTasks Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List tasks = data['data'] != null && data['data']['tasks'] != null 
+            ? data['data']['tasks'] 
+            : (data['tasks'] ?? (data['data'] is List ? data['data'] : []));
+        return tasks.map<Map<String, dynamic>>((t) => Map<String, dynamic>.from(t)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching assigned tasks: $e");
+      return [];
+    }
+  }
+
+  Future<bool> completeTask(String taskId) async {
+    final String? currentToken = await _getToken();
+    if (currentToken == null || currentToken.isEmpty) return false;
+
+    try {
+      final baseUrl = dotenv.env['BASE_URL'] ?? ApiConstants.baseApiUrl;
+      final response = await http.patch(
+        Uri.parse("$baseUrl/tasks/$taskId/complete"),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'bearer $currentToken',
+          'authorization': 'bearer $currentToken',
+          'token': currentToken,
+        },
+      );
+
+      print('🚀 COMPLETE_TASK_RESPONSE: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint("Task completed successfully");
+        return true;
+      } else {
+        debugPrint("Failed to complete task: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      debugPrint("Error completing task: $e");
+      return false;
+    }
+  }
+
+  Future<bool> rateWorker(String taskId, int rating) async {
+    final String? currentToken = await _getToken();
+    if (currentToken == null || currentToken.isEmpty) return false;
+
+    try {
+      final baseUrl = dotenv.env['BASE_URL'] ?? ApiConstants.baseApiUrl;
+      final response = await http.post(
+        Uri.parse("$baseUrl/tasks/$taskId/rate"),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'bearer $currentToken',
+          'authorization': 'bearer $currentToken',
+          'token': currentToken,
+        },
+        body: jsonEncode({
+          'rating': rating,
+        }),
+      );
+
+      print('🚀 RATE_WORKER_RESPONSE: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint("Worker rated successfully");
+        return true;
+      } else {
+        debugPrint("Failed to rate worker: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      debugPrint("Error rating worker: $e");
       return false;
     }
   }

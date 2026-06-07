@@ -80,39 +80,48 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<UserProvider>(context);
+    
+    // Search for the task in all potential lists
+    Map<String, dynamic> task = {};
+    task = provider.availableJobs.firstWhere(
+      (j) => j['id'] == widget.taskId,
+      orElse: () => <String, dynamic>{},
+    );
+    if (task.isEmpty) {
+      task = provider.scheduledJobs.firstWhere(
+        (j) => j['id'] == widget.taskId,
+        orElse: () => <String, dynamic>{},
+      );
+    }
+    if (task.isEmpty) {
+      task = provider.myRequests.firstWhere(
+        (j) => j['id'] == widget.taskId,
+        orElse: () => <String, dynamic>{},
+      );
+    }
+
+    final locationCoords = task['locationCoords'];
+    final images = task['images'];
+    String? imageUrl;
+    if (images is List && images.isNotEmpty) {
+      imageUrl = images[0]?.toString();
+    } else if (images is String && images.isNotEmpty) {
+      imageUrl = images;
+    }
+
     return Scaffold(
-      /*bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFFF2EFE9),
-        currentIndex: 10, // عشان يفضل منور عند Jobs
-        selectedItemColor:Colors.grey,
-        // AppColors.primaryDarkGreen, // اللون الأخضر اللي إنتي مستخدماه
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.work), label: 'Jobs'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.monetization_on),
-            label: 'Earnings',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
-        ],
-        onTap: (index) {
-          //if (index != 0) {
-            Navigator.pop(context); // لو داس على حاجة تانية يرجعه للرئيسية
-         // }
-        },
-      ),*/
       backgroundColor: AppColors.backgroundWhite,
-      // const Color(0xFFF1F1E6),
       appBar: AppBar(
         title: const Text(
-          'Task Details', //style: TextStyle(color: AppColors.backgroundWhite),
+          'Task Details',
         ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            _buildTaskDetailsCard(),
+            _buildTaskDetailsCard(task, imageUrl, locationCoords),
             const SizedBox(height: 20),
             _buildCustomerInfoCard(),
             const SizedBox(height: 30),
@@ -124,13 +133,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   // الكارت الأول: تعديل ترتيب العنوان والتخصص والسعر
-  Widget _buildTaskDetailsCard() {
+  Widget _buildTaskDetailsCard(Map<String, dynamic> task, String? imageUrl, dynamic locationCoords) {
+    final String locationName = task['location'] ?? 'Unknown Location';
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Color(0xFFF2EFE9),
-        //AppColors.backgroundWhite,
-        // color: Colors.white,
+        color: const Color(0xFFF2EFE9),
         borderRadius: BorderRadius.circular(25),
       ),
       child: Column(
@@ -228,58 +237,45 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           ),
           const SizedBox(height: 8),
           Text(widget.details, style: const TextStyle(fontSize: 13)),
-          const SizedBox(height: 25),
+          
+          // --- Task image display ---
+          _buildTaskImage(imageUrl),
+
+          const SizedBox(height: 15),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Location & Timing',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    SizedBox(height: 10),
+                    
+                    // --- Task location indicator with map icon ---
+                    _buildLocationTile(locationCoords, locationName),
+
+                    const SizedBox(height: 5),
                     Row(
                       children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 16,
-                          color: Colors.red,
-                        ),
-                        Text(
-                          ' East Suburbs, 15 mi',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 5),
-                    Row(
-                      children: [
-                        Icon(
+                        const Icon(
                           Icons.calendar_month,
                           size: 16,
                           color: Colors.blue,
                         ),
+                        const SizedBox(width: 5),
                         Text(
-                          ' Tomorrow, 10:00 AM',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 5),
-                    Row(
-                      children: [
-                        Icon(Icons.access_time, size: 16, color: Colors.grey),
-                        Text(
-                          ' Posted 3h ago',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                          task['posted'] != null ? ' ${task['posted']}' : ' Tomorrow, 10:00 AM',
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 10),
               Column(
                 children: [
                   _buildSmallActionBtn(
@@ -296,6 +292,96 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTaskImage(String? imageUrl) {
+    return Container(
+      width: double.infinity,
+      height: 180,
+      margin: const EdgeInsets.only(top: 15, bottom: 15),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: imageUrl != null && imageUrl.isNotEmpty
+            ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                      color: AppColors.primaryDarkGreen,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return _buildPlaceholderImage("Failed to load image");
+                },
+              )
+            : _buildPlaceholderImage("No image provided"),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderImage(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.image_not_supported_outlined, size: 40, color: Colors.grey.shade400),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocationTile(dynamic locationCoords, String locationName) {
+    final bool hasCoords = locationCoords != null && 
+        locationCoords is Map &&
+        locationCoords['lat'] != null && 
+        locationCoords['lng'] != null;
+        
+    return Container(
+      margin: const EdgeInsets.only(top: 10, bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primaryDarkGreen.withOpacity(0.1),
+          child: const Icon(Icons.map_outlined, color: AppColors.primaryDarkGreen, size: 20),
+        ),
+        title: Text(
+          locationName,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          hasCoords ? '📍 Location provided' : 'No coordinates available',
+          style: TextStyle(
+            fontSize: 11, 
+            color: hasCoords ? Colors.green.shade700 : Colors.grey.shade600,
+            fontWeight: hasCoords ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }

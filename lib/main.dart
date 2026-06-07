@@ -50,7 +50,7 @@ class MyApp extends StatelessWidget {
       });
     }
 
-    Widget initialScreen = const LoginScreen();
+    Widget initialScreen = const WelcomeScreenModified();
     if (startToken != null) {
       if (startRole == 'worker') {
         initialScreen = const MainScreen(selectedSkills: []);
@@ -141,10 +141,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      // home: const WelcomeScreenModified(),
-      // home: const MainScreen(selectedSkills: []),
-      // TODO: REVERT THIS LATER
-      home: const WorkerMapTestScreen(),
+      home: initialScreen,
     );
   }
 }

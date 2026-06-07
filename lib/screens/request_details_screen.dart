@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'user_provider.dart';
 import 'welcome_screen_modified.dart';
 import '../core/api_constants.dart';
+import 'package:latlong2/latlong.dart' hide Path;
+import 'location_picker_screen.dart';
 
 class JobDetailsScreen extends StatefulWidget {
   final String serviceName;
@@ -39,6 +41,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
 
   File? _selectedImage;
   bool _isUploading = false;
+  double? _selectedLat;
+  double? _selectedLng;
 
   @override
   void initState() {
@@ -48,6 +52,14 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     _budgetController = TextEditingController(text: widget.isEdit ? widget.editData!['price'].toString() : "");
     _descriptionController = TextEditingController(text: widget.isEdit ? (widget.editData!['description'] ?? "") : "");
     _locationController = TextEditingController(text: widget.isEdit ? (widget.editData!['location'] ?? "") : "");
+
+    if (widget.isEdit && widget.editData != null && widget.editData!['locationCoords'] != null) {
+      final coords = widget.editData!['locationCoords'];
+      if (coords is Map) {
+        _selectedLat = double.tryParse(coords['lat']?.toString() ?? '');
+        _selectedLng = double.tryParse(coords['lng']?.toString() ?? '');
+      }
+    }
   }
 
   @override
@@ -116,6 +128,13 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       return;
     }
 
+    if (_selectedLat == null || _selectedLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select a task location (Set Task Location is required)")),
+      );
+      return;
+    }
+
     setState(() => _isUploading = true);
 
     try {
@@ -146,6 +165,14 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       request.fields['description'] = _descriptionController.text;
       request.fields['budget'] = _budgetController.text;
       request.fields['location'] = _locationController.text;
+      if (_selectedLat != null && _selectedLng != null) {
+        request.fields['locationCoords[lat]'] = _selectedLat!.toString();
+        request.fields['locationCoords[lng]'] = _selectedLng!.toString();
+        request.fields['locationCoords'] = jsonEncode({
+          'lat': _selectedLat,
+          'lng': _selectedLng,
+        });
+      }
       
       // Dynamic Category ID (Task 2) - Strictly avoid dummy hardcoding
       if (widget.categoryId != null && widget.categoryId!.isNotEmpty) {
@@ -297,6 +324,42 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               "Detailed Location / Access Notes (Required)",
               "456 Customer Ave, Apt 1A...",
               controller: _locationController,
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final result = await Navigator.push<LatLng>(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LocationPickerScreen()),
+                );
+                if (result != null) {
+                  setState(() {
+                    _selectedLat = result.latitude;
+                    _selectedLng = result.longitude;
+                  });
+                }
+              },
+              icon: Icon(
+                _selectedLat == null ? Icons.add_location_alt_rounded : Icons.check_circle_rounded,
+                color: _selectedLat == null ? AppColors.primaryDarkGreen : Colors.green,
+              ),
+              label: Text(
+                _selectedLat == null ? 'Set Task Location (Required)' : 'Location Selected Successfully ✅',
+                style: TextStyle(
+                  color: _selectedLat == null ? AppColors.primaryDarkGreen : Colors.green[800],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 52),
+                side: BorderSide(
+                  color: _selectedLat == null ? AppColors.primaryDarkGreen : Colors.green,
+                  width: 2,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+              ),
             ),
             const SizedBox(height: 30),
             ElevatedButton(

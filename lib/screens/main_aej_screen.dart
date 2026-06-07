@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'welcome_screen_modified.dart';
 import 'jobs_screen.dart'; 
+import 'assigned_tasks_screen.dart';
 import 'earnings_screen.dart'; 
 import 'account_screen.dart'; 
 
@@ -24,6 +25,7 @@ class _MainScreenState extends State<MainScreen> {
     // 2. بنملا اللستة هنا أول ما الصفحة تفتح (عشان نقدر نستخدم widget.selectedSkills)
     _widgetOptions = [
       JobsScreen(selectedSkills: widget.selectedSkills),
+      const AssignedTasksScreen(),
       const EarningsScreen(),
       AccountScreen(selectedSkills: widget.selectedSkills),
     ];
@@ -54,6 +56,7 @@ class _MainScreenState extends State<MainScreen> {
         unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.work), label: 'Jobs'),
+          BottomNavigationBarItem(icon: Icon(Icons.assignment), label: 'My Tasks'),
           BottomNavigationBarItem(icon: Icon(Icons.monetization_on), label: 'Earnings'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
         ],

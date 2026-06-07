@@ -264,7 +264,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       color: _selectedLat == null ? AppColors.primaryDarkGreen : Colors.green,
                     ),
                     label: Text(
-                      _selectedLat == null ? 'تحديد موقع العمل (مطلوب)' : 'تم تحديد الموقع بنجاح ✅',
+                      _selectedLat == null ? 'Set Work Location (Required)' : 'Location Selected Successfully ✅',
                       style: TextStyle(
                         color: _selectedLat == null ? AppColors.primaryDarkGreen : Colors.green[800],
                         fontWeight: FontWeight.bold,
