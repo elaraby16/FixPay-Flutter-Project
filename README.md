@@ -22,5 +22,5 @@ I was responsible for developing the full mobile client using Flutter and Dart. 
 * **Identity & Verification Pipeline:** Developed a multi-step verification process handling multipart image uploads (via `image_picker`) and secure OTP inputs (via `pinput`).
 * **Direct Chat Interface:** Built a peer-to-peer messaging UI to facilitate real-time text exchange between matched users and workers.
 
-## 📸 Screenshots
-*(You can add screenshots of your UI here later by dragging and dropping them into the editor)*
+
+
